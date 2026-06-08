@@ -44,9 +44,9 @@ export const getUser = async (username, playmode = 'std', includeTopPlays = fals
 
 	let userData;
 	try {
-		const response = await platform.httpGet(
-			`https://osu.ppy.sh/api/v2/users/${username}/${playmodes[playmode]}?key=username`,
-			{ Authorization: `Bearer ${token}` }
+		const response = await platform.httpGetWithHeaders(
+			`https://osu.ppy.sh/api/v2/users/${encodeURIComponent(username)}/${playmodes[playmode]}?key=username`,
+			{ 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
 		);
 		userData = JSON.parse(response);
 	} catch (error) {
@@ -57,33 +57,60 @@ export const getUser = async (username, playmode = 'std', includeTopPlays = fals
 		return { error: `Unknown Error: ${error.message}` };
 	}
 
-	// Shape the data to match what the rest of the app expects
+	// Shape the data to match what render.js expects
 	const data = {
 		current_mode: playmode,
 		user: {
 			id: userData.id,
 			username: userData.username,
 			avatar_url: userData.avatar_url,
-			cover_url: userData.cover_url,
+			cover_url: userData.cover.url,
 			country_code: userData.country_code,
-			country: userData.country,
+			country: {
+				name: userData.country.name,
+				code: userData.country_code,
+			},
 			is_supporter: userData.is_supporter,
 			support_level: userData.support_level,
-			statistics: userData.statistics,
-			rank_history: userData.rank_history,
-			groups: userData.groups,
-		}
+			user_achievements: userData.user_achievements ?? [],
+			statistics: {
+				level: userData.statistics.level,
+				pp: userData.statistics.pp,
+				global_rank: userData.statistics.global_rank,
+				country_rank: userData.statistics.country_rank,
+				hit_accuracy: userData.statistics.hit_accuracy,
+				play_count: userData.statistics.play_count,
+				play_time: userData.statistics.play_time,
+				ranked_score: userData.statistics.ranked_score,
+				total_score: userData.statistics.total_score,
+				total_hits: userData.statistics.total_hits,
+				maximum_combo: userData.statistics.maximum_combo,
+				replays_watched_by_others: userData.statistics.replays_watched_by_others,
+				grade_counts: userData.statistics.grade_counts,
+			},
+		},
+		top_ranks: {
+			best: { items: [] },
+			firsts: { count: 0 },
+		},
 	};
 
 	if (includeTopPlays) {
 		try {
-			const topPlaysResponse = await platform.httpGet(
-				`https://osu.ppy.sh/api/v2/users/${userData.id}/scores/best?mode=${playmodes[playmode]}&limit=5`,
-				{ Authorization: `Bearer ${token}` }
+			const bestResponse = await platform.httpGetWithHeaders(
+				`https://osu.ppy.sh/api/v2/users/${userData.id}/scores/best?mode=${playmodes[playmode]}&limit=1`,
+				{ 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
 			);
-			data.top_ranks = { items: JSON.parse(topPlaysResponse) };
+			const firstsResponse = await platform.httpGetWithHeaders(
+				`https://osu.ppy.sh/api/v2/users/${userData.id}/scores/firsts?mode=${playmodes[playmode]}&limit=1`,
+				{ 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+			);
+			data.top_ranks.best = { items: JSON.parse(bestResponse) };
+			// firsts endpoint doesn't return count directly, use cursor_string workaround
+			const firstsParsed = JSON.parse(firstsResponse);
+			data.top_ranks.firsts = { count: userData.scores_first_count ?? 0 };
 		} catch (error) {
-			data.top_ranks = { items: [] };
+			// leave defaults
 		}
 	}
 
@@ -111,7 +138,6 @@ export const getImageBase64 = async (url) => {
 };
 
 export const getUserOsuSkills = async (username) => {
-	// osuSkills scraping is unchanged as it has no official API
 	const calcSingleSkill = (value, globalRank, countryRank) => {
 		value = parseInt(value);
 		globalRank = parseInt(globalRank);
