@@ -37,6 +37,11 @@ platform.httpGetBuffer = async (url) => {
 	return response.body;
 };
 
+platform.httpPost = async (url, body) => {
+	const response = await got.post(url, { json: body, responseType: 'json' });
+	return response.body;
+};
+
 platform.resizeImage = async (img, w, h, blur = 0, flop = false) => {
 	let pipeline = sharp(img).resize(w, h);
 	if (blur > 0) pipeline = pipeline.blur(blur);
