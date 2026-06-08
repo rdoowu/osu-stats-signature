@@ -22,6 +22,9 @@ export const platform = {
 	// HTTP GET returning response body as Buffer/Uint8Array. Throws on non-2xx.
 	httpGetBuffer: null,
 
+	// HTTP POST returning response body as string. Throws on non-2xx.
+	httpPost: null,
+
 	// Process cover image: (buffer, w, h, blur, flop) => base64 data URI string
 	resizeImage: null,
 
